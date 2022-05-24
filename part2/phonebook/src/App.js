@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import axios from 'axios'
 
 // <button onClick={()=> console.log(props.persons)}>press me</button>
 
@@ -54,6 +55,16 @@ const App = () => {
   const [newNumber, setNewNumber] = useState("");
   const [newFilter, setNewFilter] = useState("");
   // const [showAll, setShowAll] = useState(true)
+
+  useEffect(() => {
+    console.log('effect')
+    axios
+      .get('http://localhost:3002/persons')
+      .then(response => {
+        console.log('promise fulfilled')
+        setPersons(response.data)
+      })
+  }, [])
 
   const addNote = (event) => {
     let tester = "ch";
