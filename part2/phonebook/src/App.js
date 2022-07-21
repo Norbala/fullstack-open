@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import axios from 'axios'
+import backend from './backendComm/backend'
 
 // <button onClick={()=> console.log(props.persons)}>press me</button>
 
 const SubmitForm = ({handleFilter}) => {
   return (
     <form onSubmit={(event) => event.preventDefault()}>
+      <h3 className='filterTitle'>Filter</h3>
     <div>
       filter shown with name: <input id='filterField' onChange={handleFilter} />
     </div>
@@ -36,7 +37,7 @@ const UserForm = (props) => {
 const Persons = (props) => {
   return (
     <>
-      {props.persons.map(person => <SinglePerson key={person.name} person = {person} />) 
+      {props.persons.map(person => <SinglePerson key={person.name} person = {person} function={props.function} />) 
     }
   </>
   )
@@ -45,26 +46,108 @@ const Persons = (props) => {
 
 const SinglePerson = (props) => {
   return (
-    <> <div>{props.person.name} {props.person.number}</div> </>
+    <> <div>{props.person.name} {props.person.number} <DeleteButton id={props.person.id} function={props.function} /> </div> </>
   )
-}     // <singlePerson person={} /> 
+}     // <singlePerson person={} />
+
+const DeleteButton = (props) => {
+  return (
+    <button id={props.id} onClick={(event) => props.function(event.target.id)}>delete</button>
+  )
+} 
+
+const NotificationSuccess = ({ message}) => {
+  
+
+  if (message === null) {
+    return null // ovo mi je trebalo jos prije, empty return
+  }
+  
+  const successStyle = {
+    backgroundColor: "green",
+    color: "yellow"
+  }
+  return (   
+    <div style={successStyle} >
+      {message}
+    </div>
+  )
+};
+
+const NotificationError = ({ message}) => {
+  
+
+  if (message === null) {
+    return null // ovo mi je trebalo jos prije, empty return
+  }
+  
+  const errorStyle = {
+    backgroundColor: "red",
+    fontWeight: "800"
+  }
+  return (   
+    <div style={errorStyle} >
+      {message}
+    </div>
+  )
+};
+
 
 const App = () => {
   const [persons, setPersons] = useState([]) 
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState("");
   const [newFilter, setNewFilter] = useState("");
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [successMessage, setMessage] = useState(null);
   // const [showAll, setShowAll] = useState(true)
-
+  
   useEffect(() => {
     console.log('effect')
-    axios
-      .get('http://localhost:3002/persons')
-      .then(response => {
-        console.log('promise fulfilled')
-        setPersons(response.data)
-      })
+    backend.getAll().then(response => setPersons(response))
+
   }, [])
+
+
+
+  // sets necessary states to display message and reset the states/input form afterward
+
+  // MAKNUTI OVO I SVE STAVITI U ADD NOTE UPDATE I CATCH
+  const messageSet = (input, response, error=true) => {
+    let variable = "Added successfully ";
+    if (input==="change") {
+      variable = "Number changed successfully for contact ";
+    }
+    setErrorMessage(`${variable}${newName}`);
+    console.log("newName je ", newName);
+    // nastavi ovdje
+    //document.querySelector(".message").classList.toggle("success");
+    if (input==="change") {
+      
+      setTimeout(()=>{
+        //document.querySelector(".message").classList.toggle("success")
+        setErrorMessage(null);
+        
+        }
+        ,4000);
+
+    } else {
+      setTimeout(()=>{
+        //document.querySelector(".message").classList.toggle("success")
+        setErrorMessage(null)
+        }
+        ,4000);
+    }
+    
+    document.getElementById("nameField").value = "";
+    setNewName("");
+    document.getElementById("numberField").value ="";
+    setNewNumber("");
+    if (input==="change") {
+      setPersons(response);
+    } else {setPersons(persons.concat(response))}
+  }
+  //
 
   const addNote = (event) => {
     let tester = "ch";
@@ -80,20 +163,57 @@ const App = () => {
       return (alert("empty number can't be added. Try again."))
     }
     
-    if (persons.some(person => person.name === newName)) {      
+    if (persons.some(person => person.number === newNumber)) {
+      alert(`${newNumber} is already registered as another user's number.`)
+      document.getElementById("numberField").value ="";
+      setNewNumber("");
+      testNumb = "";
 
-        alert(`${newName} is already added to phonebook.`);
+    }
+
+    if (persons.some(person => person.name === newName)) {      
+      if (window.confirm(`Do you really want to replace old number with a new one for ${newName}?`)) {
+        const id = persons.find(person => person.name === newName).id;
+        console.log("id ", id);
+        tester = "";
+        testNumb = "";
+        console.log("tester unutar: ", tester);
+        backend.replace(id, {name:newName,number:newNumber})
+        .then( response => {
+        console.log("replace response ",response);
+        setMessage(`Number changed successfully for contaaact ${response.name}`)
+
+        setTimeout(()=> {
+          setMessage(null)
+        }, 4000)
+
         document.getElementById("nameField").value = "";
         setNewName("");
-        tester = "";
-    }
-    if (persons.some(person => person.number === newNumber)) {
-        alert(`${newNumber} is already registered as another user's number.`)
         document.getElementById("numberField").value ="";
         setNewNumber("");
-        testNumb = "";
-
-    }
+        backend.getAll().then(response => {
+          setPersons(response)
+        }
+        )
+        }).catch(error => {
+          console.log("error content",error);
+          setErrorMessage(
+            
+            ` ${newName} was already removed from server`
+          )
+          document.getElementById("nameField").value = "";
+          setNewName("");
+          document.getElementById("numberField").value ="";
+          setNewNumber("");
+          setTimeout(()=> {
+            setErrorMessage(null)
+          }, 4000)
+        } )
+      } 
+      }
+    // nkead su rješenja jednostavnija nego što se čine..... newName gore ubaciti za varijablu u poruci
+    
+    
 
     console.log(tester);
     console.log(testNumb);
@@ -102,15 +222,29 @@ const App = () => {
         name: newName,
         number: newNumber
       }
-      setPersons(persons.concat(nameObject))
+      
+      backend
+      .addNumb(nameObject)
+      .then(response => {
+        console.log("response je ", response);
 
-      document.getElementById("nameField").value = "";
-      setNewName("");
-      document.getElementById("numberField").value ="";
-      setNewNumber("");
+        setMessage(`Added successfully (for real) ${response.name}`);
+        setTimeout(()=> {
+          setMessage(null)
+        }, 3000)
+
+        document.getElementById("nameField").value = "";
+        setNewName("");
+        document.getElementById("numberField").value ="";
+        setNewNumber("");
+        setPersons(persons.concat(response))
+        })
+        
+
     }
     
   }
+  
 
   
 
@@ -129,18 +263,29 @@ const App = () => {
   // control the filter
   let personsToShow = persons.filter(person => person.name.toLowerCase().includes(newFilter)) // toLower to ensure it matches with newFilter
 
+  const deleteFunc = (event) => {    // PRVI FEJL - NE STAVLJATI DOLE U COMPONENT deletefunc() jer to automatski radi function call pri svakom renderu.. valjda
+    // vec treba napisati samo deleteFunc
+    const result = personsToShow.filter(object => object.id===parseInt(event));
+    if (window.confirm(`Do you really want to delete ${result[0].name}?`)) {
+      backend.deleteElem(event).then(() => backend.getAll().then(response => setPersons(response))) 
+    }
+  }
+
   return (
     <div>
       <h2>Phonebook</h2>
+      <NotificationSuccess message={successMessage} />
+      <NotificationError message={errorMessage} />
+
       <SubmitForm handleFilter={handleFilterChange} />
-      <h2>add a new</h2>
+      <h2>Add a new contact</h2>
       <UserForm NameChange={handleNameChange} NumberChange={handleNumberChange} Note={addNote} />
       
       <h2>Numbers</h2>
-      <Persons persons={personsToShow} />
+      <Persons persons={personsToShow} function={deleteFunc} />
       
     </div>
   )
 }
-//
-export default App
+export default App;
+
